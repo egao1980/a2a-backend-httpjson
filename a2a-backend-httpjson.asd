@@ -1,9 +1,10 @@
 (defsystem "a2a-backend-httpjson"
-  :version "0.1.0"
+  :version "0.2.0"
   :description "HTTP+JSON REST binding for a2a-protocol"
   :author "egao1980"
   :license "MIT"
-  :depends-on ("a2a-protocol" "http-protocol" "http-server-protocol")
+  :depends-on ("a2a-protocol" "http-protocol" "http-server-protocol"
+               "sse-protocol" "babel")
   :serial t
   :pathname "src"
   :components ((:file "package")
