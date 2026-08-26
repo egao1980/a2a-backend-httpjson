@@ -256,7 +256,7 @@
       (t
        (a2a-protocol:signal-a2a-error
         :message (format nil "HTTP ~a~@[ ~a~]" status
-                         (and (plusp (length text)) text))))))))
+                         (and (plusp (length text)) text)))))))
 
 (defun %card-url (url)
   (if (search "/.well-known/" url)
