@@ -85,3 +85,18 @@
     (ok (eql 404 (first res)))
     (ok (eql a2a-protocol:+a2a-error-task-not-found+
              (gethash "code" (gethash "error" body))))))
+
+(deftest missing-http-backend-signals
+  (let ((http-protocol:*http-backend* nil))
+    (ok (signals (a2a-protocol:send-message
+                  (a2a-backend-httpjson:make-httpjson-a2a-backend
+                   :url "http://127.0.0.1:9/")
+                  (a2a-protocol:make-a2a-message :text "x"))
+                 'a2a-protocol:a2a-error))))
+
+(deftest resubscribe-is-unsupported
+  (ok (signals (a2a-protocol:resubscribe-task
+                (a2a-backend-httpjson:make-httpjson-a2a-backend
+                 :url "http://127.0.0.1:9/")
+                "t1")
+               'a2a-protocol:a2a-unsupported)))
