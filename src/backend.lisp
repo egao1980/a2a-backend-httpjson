@@ -222,13 +222,13 @@
 
 (defun %ensure-http ()
   (unless http-protocol:*http-backend*
-    (error 'a2a-protocol:a2a-error
-           :message "*http-backend* is nil — bind an http-protocol backend")))
+    (a2a-protocol:signal-a2a-error
+     :message "*http-backend* is nil — bind an http-protocol backend")))
 
 (defun %ensure-url (backend)
   (or (backend-url backend)
-      (error 'a2a-protocol:a2a-error
-             :message "httpjson backend has no :url")))
+      (a2a-protocol:signal-a2a-error
+       :message "httpjson backend has no :url")))
 
 (defun %join (base path &optional query)
   (let ((url (format nil "~a~a" (string-right-trim "/" base) path)))
@@ -248,15 +248,15 @@
     (cond
       ((and obj (hash-table-p obj) (gethash "error" obj))
        (let ((err (gethash "error" obj)))
-         (error 'a2a-protocol:a2a-error
-                :code (gethash "code" err)
-                :message (gethash "message" err)
-                :data (gethash "data" err))))
+         (a2a-protocol:signal-a2a-error
+          :code (gethash "code" err)
+          :message (gethash "message" err)
+          :data (gethash "data" err))))
       ((<= 200 status 299) obj)
       (t
-       (error 'a2a-protocol:a2a-error
-              :message (format nil "HTTP ~a~@[ ~a~]" status
-                               (and (plusp (length text)) text)))))))
+       (a2a-protocol:signal-a2a-error
+        :message (format nil "HTTP ~a~@[ ~a~]" status
+                         (and (plusp (length text)) text)))))))
 
 (defun %card-url (url)
   (if (search "/.well-known/" url)
@@ -353,9 +353,9 @@
 (defmethod a2a-protocol:resubscribe-task ((backend httpjson-a2a-backend) task-id
                                           &key on-event)
   (declare (ignore task-id on-event))
-  (error 'a2a-protocol:a2a-error
-         :message "SubscribeToTask is JSON-RPC only in this binding"
-         :code a2a-protocol:+a2a-error-unsupported-operation+))
+  (a2a-protocol:signal-a2a-error
+   :message "SubscribeToTask is JSON-RPC only in this binding"
+   :reason :unsupported))
 
 (defun %ensure-http-server ()
   (or http-server-protocol:*http-server-backend*
