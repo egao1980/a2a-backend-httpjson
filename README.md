@@ -11,7 +11,7 @@ HTTP+JSON REST binding for [`a2a-protocol`](https://github.com/egao1980/a2a-prot
 | POST | `/tasks/{id}:cancel` |
 | GET | `/extendedAgentCard` |
 
-`A2A-Version` header is accepted; empty means `0.3`.
+`A2A-Version` header is accepted; empty means `0.3`. `stream-message` uses `rpc-call-stream` (POST `/message:stream`, Accept `text/event-stream`). Push-notification methods stay refused.
 
 ```lisp
 (asdf:load-system "a2a-backend-httpjson")
