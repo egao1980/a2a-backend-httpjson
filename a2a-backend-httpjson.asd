@@ -17,7 +17,7 @@
   :depends-on ("a2a-backend-httpjson"
                "http-server-backend-hunchentoot"
                "http-backend-async"
-               "event-backend-libuv"
+               "http-backend-dexador"
                "event-protocol"
                "usocket"
                "rove")
