@@ -15,6 +15,45 @@
 (defun use-httpjson-a2a-backend (&rest args &key &allow-other-keys)
   (setf a2a-protocol:*a2a-backend* (apply #'make-httpjson-a2a-backend args)))
 
+(defclass httpjson-rpc-transport (rpc-backend-http:http-rpc-transport)
+  ()
+  (:documentation "http-rpc-transport that POSTs REST JSON, not a JSON-RPC envelope."))
+
+(defun make-httpjson-rpc-transport
+    (&key url (protocol-version a2a-protocol:+a2a-protocol-version+))
+  (make-instance 'httpjson-rpc-transport
+                 :url url
+                 :headers `(("A2A-Version" . ,protocol-version)
+                            ("accept" . "application/json, text/event-stream"))))
+
+(defun %rest-path (method)
+  (cond
+    ((member method '("SendStreamingMessage" "message/stream") :test #'string=)
+     "/message:stream")
+    ((member method '("SendMessage" "message/send") :test #'string=)
+     "/message:send")
+    (t nil)))
+
+(defmethod rpc-backend-http:http-rpc-request-url ((transport httpjson-rpc-transport)
+                                                  method)
+  (let ((base (string-right-trim "/" (or (rpc-backend-http:transport-url transport)
+                                         "")))
+        (path (%rest-path method)))
+    (unless (and (plusp (length base)) path)
+      (a2a-protocol:signal-a2a-error
+       :message (format nil "httpjson RPC transport cannot route ~s" method)))
+    (format nil "~a~a" base path)))
+
+(defmethod rpc-backend-http:http-rpc-encode-body ((transport httpjson-rpc-transport)
+                                                  method params &key id notify)
+  (declare (ignore transport method id notify))
+  (a2a-protocol:encode-json (or params (a2a-protocol:json-object))))
+
+(defmethod rpc-backend-http:http-rpc-decode-event ((transport httpjson-rpc-transport)
+                                                   event)
+  (declare (ignore transport))
+  (a2a-protocol:decode-json (or (sse-protocol:sse-event-data event) "")))
+
 (defun well-known-card-path-p (path)
   (member path '("/.well-known/agent-card.json" "/.well-known/agent.json")
           :test #'string=))
@@ -295,16 +334,27 @@
 (defmethod a2a-protocol:stream-message ((backend httpjson-a2a-backend) message
                                         &key on-event)
   (%ensure-http)
-  (let* ((res (http:post (%join (%ensure-url backend) "/message:stream")
-                         :content (a2a-protocol:encode-json
-                                   (a2a-protocol:json-object
-                                    "message" (a2a-protocol:encode-message message)))
-                         :headers (%headers backend)))
-         (text (%body-string res))
-         (events (mapcar (lambda (ev)
-                           (a2a-protocol:decode-json (sse-protocol:sse-event-data ev)))
-                         (with-input-from-string (s text)
-                           (sse-protocol:collect-sse-events s)))))
+  (let ((events
+          (handler-case
+              (let* ((tx (make-httpjson-rpc-transport
+                          :url (%ensure-url backend)
+                          :protocol-version (backend-protocol-version backend)))
+                     (stream (rpc-protocol:rpc-call-stream
+                              "SendStreamingMessage"
+                              (a2a-protocol:json-object
+                               "message" (a2a-protocol:encode-message message))
+                              :transport tx)))
+                (unwind-protect
+                     (loop for ev = (rpc-protocol:rpc-recv stream)
+                           until (eq ev :eof)
+                           collect ev)
+                  (rpc-protocol:rpc-close stream)))
+            (rpc-protocol:rpc-error (c)
+              (a2a-protocol:signal-a2a-error
+               :message (rpc-protocol:rpc-error-message c)
+               :code (rpc-protocol:rpc-error-code c)
+               :data (rpc-protocol:rpc-error-data c)
+               :cause c)))))
     (when on-event
       (mapc on-event events))
     (a2a-protocol:make-a2a-stream-result events)))
